@@ -24,31 +24,90 @@ namespace Tetris.Models
 
         public Color?[,] Cells { get; } = new Color?[10, 20];
 
+        class Cell
+        {
+            public Color? Color { get; set; }
+
+            enum State
+            {
+                Empty,
+                MovingPiece,
+                Filled
+            }
+        }
+
         public async Task Start()
         {
             var rand = new Random();
             while (true)
             {
-                var changes = new List<CellChange>();
-                for (int x = 0; x < Cells.GetLength(0); x++)
-                {
-                    for (int y = 0; y < Cells.GetLength(1); y++)
-                    {
-                        Cells[x, y] = Color.FromRgb(
-                              (byte)rand.Next(256),
-                              (byte)rand.Next(256),
-                              (byte)rand.Next(256)
-                          );
-                        changes.Add(new CellChange(x, y, Cells[x,y]));
-                    }
-                }
+                var currentPiece = GetNewPiece();
+                var position = (x: 5, y: 15);
 
-                _changesPump.OnNext(new CellChanges(changes.ToArray()));
-                await Task.Delay(10);
+                do
+                {
+                    var changes = new List<CellChange>();
+
+                    void SetCell(int x, int y, Color? color)
+                    {
+                        if (Cells[x, y] != color)
+                        {
+                            changes.Add(new CellChange(x, y, color));
+                            Cells[x, y] = color;
+                        }
+                    }
+
+                    void ShiftCurrentPieceDown()
+                    {
+                        for (int i = 0; i < 4; i++)
+                        {
+                            if (currentPiece.Cells[i])
+                            {
+                                SetCell(position.x + i, position.y, null);
+                            }
+                        }
+
+                        for (int i = 0; i < 16; i++)
+                        {
+                            var (px, py) = (i % 4, i / 4);
+                            SetCell(position.x + px, position.y + py,
+                                currentPiece.Cells[i] ? currentPiece.Color : (Color?) null);
+                        }
+
+                        position.y--;
+                    }
+
+                    ShiftCurrentPieceDown();
+
+                    _changesPump.OnNext(new CellChanges(changes.ToArray()));
+                    await Task.Delay(500);
+                } while (position.y > 4);
             }
         }
 
+        private Piece GetNewPiece()
+        {
+            return new Piece(new[]
+            {
+                true, false, false, false,
+                true, false, false, false,
+                true, true, false, false,
+                false, false, false, false
+            }, Colors.DarkBlue);
+        }
+
         public IObservable<CellChanges> CellChanges { get; }
+    }
+
+    internal class Piece
+    {
+        public Piece(bool[] cells, Color color)
+        {
+            Cells = cells;
+            Color = color;
+        }
+        public bool[] Cells { get; }
+        public Color Color { get; }
     }
 
     internal class CellChanges
