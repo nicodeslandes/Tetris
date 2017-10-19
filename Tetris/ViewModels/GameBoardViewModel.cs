@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using System.Windows.Media;
 using ReactiveUI;
 using Tetris.Annotations;
@@ -19,12 +20,14 @@ namespace Tetris.ViewModels
         private const int BoardSizeX = 10;
         private const int BoardSizeY = 20;
 
-        private CellViewModel[] _cells = new CellViewModel[BoardSizeX * BoardSizeY];
+        private readonly CellViewModel[] _cells = new CellViewModel[BoardSizeX * BoardSizeY];
 
         public GameBoardViewModel()
         {
             var model = new GameBoard();
             StartCommand = ReactiveCommand.CreateFromTask(model.Start);
+            KeyPressedCommand = ReactiveCommand.Create<string>(k =>
+                model.HandleKeyPress((Key) Enum.Parse(typeof(Key), k)));
 
             Cells = CreateCellViewModels(model);
             model.CellChanges.Subscribe(OnCellModelChanges);
@@ -59,6 +62,8 @@ namespace Tetris.ViewModels
         public ReadOnlyCollection<CellViewModel> Cells { get; }
 
         public ReactiveCommand StartCommand { get; }
+
+        public ReactiveCommand KeyPressedCommand { get; }
     }
 
     internal class CellViewModel: INotifyPropertyChanged

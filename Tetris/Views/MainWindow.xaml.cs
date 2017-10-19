@@ -12,13 +12,7 @@ namespace Tetris.Views
         public MainWindow()
         {
             InitializeComponent();
-            GameBoard.DataContext = new GameBoardViewModel();
-        }
-
-
-        private void Start(object sender, RoutedEventArgs e)
-        {
-            
+            DataContext = new GameBoardViewModel();
         }
     }
 }

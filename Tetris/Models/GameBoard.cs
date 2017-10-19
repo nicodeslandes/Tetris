@@ -5,12 +5,16 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace Tetris.Models
 {
     class GameBoard
     {
+        public const int BoardSizeX = 10;
+        public const int BoardSizeY = 20;
+
         private readonly Subject<CellChanges> _changesPump = new Subject<CellChanges>();
 
         public GameBoard()
@@ -36,53 +40,100 @@ namespace Tetris.Models
             }
         }
 
+        public void HandleKeyPress(Key key)
+        {
+            switch (key)
+            {
+                case Key.Left:
+                    ShiftCurrentPiece((-1, 0));
+                    break;
+                case Key.Right:
+                    ShiftCurrentPiece((1, 0));
+                    break;
+                case Key.Down:
+                    ShiftCurrentPiece((0, -1));
+                    break;
+            }
+        }
+
+        class Movement
+        {
+            public Movement((int dx, int dy) m)
+            {
+                Dx = m.dx;
+                Dy = m.dy;
+            }
+
+            public int Dx { get; }
+            public int Dy { get; }
+
+            public static implicit operator Movement((int dx, int dy) m)
+            {
+                return new Movement(m);
+            }
+
+        }
+
+        Piece currentPiece;
+        (int x, int y) position = (x: 5, y: 15);
+
         public async Task Start()
         {
             var rand = new Random();
             while (true)
             {
-                var currentPiece = GetNewPiece();
-                var position = (x: 5, y: 15);
+                currentPiece = GetNewPiece();
+                position = (x: 5, y: 18);
 
                 do
                 {
-                    var changes = new List<CellChange>();
-
-                    void SetCell(int x, int y, Color? color)
-                    {
-                        if (Cells[x, y] != color)
-                        {
-                            changes.Add(new CellChange(x, y, color));
-                            Cells[x, y] = color;
-                        }
-                    }
-
-                    void ShiftCurrentPieceDown()
-                    {
-                        for (int i = 0; i < 4; i++)
-                        {
-                            if (currentPiece.Cells[i])
-                            {
-                                SetCell(position.x + i, position.y, null);
-                            }
-                        }
-
-                        for (int i = 0; i < 16; i++)
-                        {
-                            var (px, py) = (i % 4, i / 4);
-                            SetCell(position.x + px, position.y + py,
-                                currentPiece.Cells[i] ? currentPiece.Color : (Color?) null);
-                        }
-
-                        position.y--;
-                    }
-
-                    ShiftCurrentPieceDown();
-
-                    _changesPump.OnNext(new CellChanges(changes.ToArray()));
+                    ShiftCurrentPiece((dx: 0, dy: -1));
                     await Task.Delay(500);
-                } while (position.y > 4);
+                } while (position.y > 0);
             }
+        }
+
+        void ShiftCurrentPiece(Movement m)
+        {
+            var changes = new List<CellChange>();
+
+            void SetCell(int x, int y, Color? color)
+            {
+                if (x < 0 || x >= BoardSizeX || y < 0 || y >= BoardSizeY)
+                    return;
+
+                if (Cells[x, y] != color)
+                {
+                    changes.Add(new CellChange(x, y, color));
+                    Cells[x, y] = color;
+                }
+            }
+
+            // Clear all cells currently covered by the current piece
+            // TODO: We could avoid clearing cells that we still
+            // be covered after the pieve has moved
+            for (int i = 0; i < 16; i++)
+            {
+                if (currentPiece.Cells[i])
+                {
+                    var (px, py) = (i % 4, i / 4);
+                    SetCell(position.x + px, position.y + py, null);
+                }
+            }
+
+            // Update the piece's position
+            position.x += m.Dx;
+            position.y += m.Dy;
+
+            // Fill all the cells for the new position
+            for (int i = 0; i < 16; i++)
+            {
+                var (px, py) = (i % 4, i / 4);
+                SetCell(position.x + px, position.y + py,
+                    currentPiece.Cells[i] ? currentPiece.Color : (Color?)null);
+            }
+
+            _changesPump.OnNext(new CellChanges(changes.ToArray()));
         }
 
         private Piece GetNewPiece()
